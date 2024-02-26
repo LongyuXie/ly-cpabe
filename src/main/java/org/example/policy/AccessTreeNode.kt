@@ -15,6 +15,7 @@ class AccessTreeNode {
     // 密文项直接存储在访问树中，因此解密时递归根节点即可
     var cx: Element? = null
     var cxPrime: Element? = null
+    var minSatisIndex: IntArray? = null
 
     val isLeaf: Boolean
         get() = children.isEmpty() && attr != null

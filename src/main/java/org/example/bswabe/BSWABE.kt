@@ -68,42 +68,47 @@ class BSWABE() {
 
 
     // m: Gt
-    fun enc(m: Element, policy: String): Map<Any, Any> {
+    fun enc(m: Element, policy: String): Ciphertext {
         val tree = AccessTree.fromPolicyString(policy)
-//        val s = helper.randomZr()
-        val s = helper.setInt(20)
-        val r = helper.setInt(10)
-        println("e_gg_rs: ${helper.pairing(g, g).powZn(r).powZn(s)}")
+        val s = helper.randomZr()
         val C_Tilde = m.duplicate().mul(e_gg_alpha.powZn(s)).immutable
         val C = h.powZn(s).immutable
 
         tree.fillPolicy(s, mpk)
-        return mutableMapOf<Any, Any>().apply {
-            put("C", C)
-            put("C_Tilde", C_Tilde)
-            put("tree", tree)
-        }
+        return Ciphertext(C_Tilde, C, tree)
     }
 
-    fun dec(ciphertext: Map<Any, Any>, sk: SecretKey): Element? {
-        val C_Tilde = ciphertext["C_Tilde"] as Element // m e(g,g)^{alpha*s}
-        val C = ciphertext["C"] as Element //
-        val tree = ciphertext["tree"] as AccessTree
+
+    /**
+     * @property msgdata GT element: m * e(g, g)^{alpha*s}
+     * @property gs G1 element: h^s
+     * @property tree accesstree with shares component
+     */
+    class Ciphertext(val msgdata: Element, val hs: Element, val tree: AccessTree)
+
+
+    fun dec(cph: Ciphertext, sk: SecretKey): Element? {
+        val attrs = sk.dMap!!.keys
+        val tree = cph.tree.minLeavesToSatisfy(attrs)
+        if (tree == null) {
+            println("no satisfying leaves")
+            return null
+        }
 
         val e_gg_rs = decryptNode(sk, tree.getRoot()!!) ?: return null
-        println("e_gg_rs: $e_gg_rs")
-
-
-        // 计算明文
-        val result = C_Tilde.duplicate()
-        val t = helper.pairing(C, sk.D!!).div(e_gg_rs)
-        result.div(t)
-
+        val result = cph.msgdata.duplicate()
+        val tmp = helper.pairing(cph.hs, sk.D!!).div(e_gg_rs)
+        result.div(tmp)
         return result
-
     }
 
+
+
     companion object {
+
+        fun hashAttr(attr: Attribute, pg: Pairing): Element {
+            return HashHelper(pg).hashFromStringToG1(attr.name)
+        }
 
         @JvmStatic
         fun main(args: Array<String>) {
@@ -113,7 +118,7 @@ class BSWABE() {
             val sk = bswabe.keygen(attrs)
 //            val m = bswabe.helper.randomG()
             val m = bswabe.helper.randomGT()
-            val policy = "(A or B) and (C or D)".lowercase(Locale.getDefault())
+            val policy = "(A or B) and (C or D) ".lowercase(Locale.getDefault())
 //            val policy = "(a or b)".lowercase(Locale.getDefault())
 
             println("policy: $policy")
@@ -150,36 +155,24 @@ class BSWABE() {
                 val diPrime = sk.dMap!![node.attr!!]!!.second
                 val cx = node.cx!!
                 val cxPrime = node.cxPrime!!
-                println("node ${node.attr!!.name}")
 
                 var result = helper.pairing(di, cx)
                 result = result.div(helper.pairing(diPrime, cxPrime))
-                println("e(g, g)^{r q_x(0)} = $result")
                 result
             } else {
                 null
             }
 
         }
-        val k = node.threshold!!.k
-        val children = node.children
-        val satisfied = mutableListOf<Int>()
-        for (i in children.indices) {
-            val c = children[i]
-            if (c.satisfy(sk.dMap!!.keys)) {
-                satisfied.add(i)
-            }
-        }
-        if (satisfied.size < k) {
-            return null
-        }
-
+        // 已经预处理过满足属性集的节点
+        // 需要确保minSatisIndex不为空
+        val satisfied = node.minSatisIndex!!
+//
         val secretHelper = SecretHelper(pg.zr)
-
         val xList = satisfied.map { i -> secretHelper.zr.newElement().set(i + 1).immutable }
         val result = pg.gt.newOneElement()
         for (i in satisfied) {
-            val c = children[i]
+            val c = node.children[i]
             var fz = decryptNode(sk, c)!!
             val cof = secretHelper.lagrangeCoefficient(xList[i], xList)
             fz = fz.duplicate().powZn(cof)
