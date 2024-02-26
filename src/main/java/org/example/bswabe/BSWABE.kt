@@ -10,6 +10,13 @@ import org.example.utils.HashHelper
 import org.example.utils.PairingGroupHelper
 import java.util.*
 
+
+/**
+ * John Bethencourt, Amit Sahai, Brent Waters.
+ * Ciphertext-Policy Attribute-Based Encryption.
+ * 2007 IEEE Symposium on Security and Privacy (SP ’07), May 2007, Berkeley, France.
+ * 10.1109/SP.2007.11. hal-01788815￿
+ */
 class BSWABE() {
 
 
@@ -52,7 +59,6 @@ class BSWABE() {
 
     fun keygen(attrs: Set<Attribute>): SecretKey {
         val secretKey = SecretKey()
-//        val r = helper.randomZr()
         val r = helper.setInt(10)
         secretKey.D = g.powZn((alpha.add(r).div(beta)))
         secretKey.dMap = mutableMapOf<Attribute, Pair<Element, Element>>().apply {
@@ -95,14 +101,49 @@ class BSWABE() {
             return null
         }
 
-        val e_gg_rs = decryptNode(sk, tree.getRoot()!!) ?: return null
+        val acc = pg.zr.newOneElement()
+        val e_gg_rs = pg.gt.newOneElement()
+        decNode(tree.getRoot()!!, sk, acc, e_gg_rs)
         val result = cph.msgdata.duplicate()
         val tmp = helper.pairing(cph.hs, sk.D!!).div(e_gg_rs)
         result.div(tmp)
         return result
     }
 
+    /**
+     * 优化了decryptNode的实现，减少了配对次数，现在只需要在每个匹配的叶子节点进行配对
+     * @param node 访问树的节点
+     * @param acc ZR 传递的累积值
+     * @param ans GT decryptNode(root)的结果
+     */
+    private fun decNode(node: AccessTreeNode, sk: SecretKey, acc: Element, ans: Element) {
+        if (node.isLeaf) {
 
+            val di = sk.dMap!![node.attr!!]!!.first
+            val diPrime = sk.dMap!![node.attr!!]!!.second
+            val cx = node.cx!!
+            val cxPrime = node.cxPrime!!
+
+            val result = pg.pairing(di, cx)
+            result.div(helper.pairing(diPrime, cxPrime))
+            result.powZn(acc)
+
+            ans.mul(result)
+
+            return
+
+        }
+        val secretHelper = SecretHelper(acc.field)
+        val satisfied = node.minSatisIndex!!
+        val xList = satisfied.map { i -> secretHelper.zr.newElement().set(i + 1).immutable }
+
+        for (i in satisfied) {
+            val child = node.children[i]
+            val cof = secretHelper.lagrangeCoefficient(xList[i], xList)
+            val tmp = acc.duplicate().mul(cof)
+            decNode(child, sk, tmp, ans)
+        }
+    }
 
     companion object {
 
@@ -174,6 +215,7 @@ class BSWABE() {
         for (i in satisfied) {
             val c = node.children[i]
             var fz = decryptNode(sk, c)!!
+            // TODO: 修改拉格朗日系数计算方式, 不再使用map
             val cof = secretHelper.lagrangeCoefficient(xList[i], xList)
             fz = fz.duplicate().powZn(cof)
             result.mul(fz)
