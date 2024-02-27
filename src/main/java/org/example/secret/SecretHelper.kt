@@ -13,24 +13,26 @@ class SecretHelper(val zr: Field<Element>) {
      * @param n the number of shares
      * @return a map of shares, key in [1, n]
      */
-    fun generateShares(s: Element, k: Int, n: Int): MutableMap<Element, Element> {
-        require(k <= n)
+    fun generateShares(s: Element, k: Int, n: Int): List<Element> {
+        require(k in 1..n)
 
         val p = randomPolynomial(k-1, constant = s)
-        val shares = mutableMapOf<Element, Element>()
+        val shares = mutableListOf<Element>()
         for (i in 1..n) {
             val x = zr.newElement().set(i).immutable
-            shares[x] = p.eval(x)
+            shares.add(p.eval(x))
         }
         return shares
     }
 
-    fun generateShares(s: Element, threshold: Threshold): MutableMap<Element, Element> {
-        return generateShares(s, threshold.k, threshold.n)
-    }
-
-    fun lagrangeCoefficient(xi: Element, xList: List<Element>): Element {
+    /**
+     * @param index the index of the share
+     * @param xList the list of x values
+     * @return the lagrange coefficient with x = 0
+     */
+    fun lagrangeCoefficient(index: Int, xList: List<Element>): Element {
         val cof = zr.newOneElement()
+        val xi = xList[index]
 
         for (xj in xList) {
             if (xi != xj) {
@@ -42,15 +44,20 @@ class SecretHelper(val zr: Field<Element>) {
         return cof
     }
 
+    /**
+     * assume the xList is [1, 2, 3, ..., n]
+     * @param yList the list of shares
+     * @return the recovered secret
+     */
     // 拉格朗日插值公式
-    fun recoverShare(shares: Map<Element, Element>): Element {
-        val xList = shares.keys.toList()
+    fun recoverShare(yList: List<Element>): Element {
+        val xList = 1.rangeTo(yList.size).map { zr.newElement().set(it).immutable }
         val share = zr.newZeroElement()
 
-        shares.forEach {
-            x, y ->
-            val cof = lagrangeCoefficient(x, xList)
-            share.add(y.duplicate().mul(cof))
+        for (i in xList.indices) {
+            val yi = yList[i]
+            val cof = lagrangeCoefficient(i, xList)
+            share.add(yi.duplicate().mul(cof))
         }
 
         return share.immutable

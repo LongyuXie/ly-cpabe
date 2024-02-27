@@ -11,15 +11,14 @@ class SecretHelperATest {
     fun recoverShare() {
         val pg = PairingGroupHelper.getSS512()!!
         val secretHelper = SecretHelper(pg.zr)
-        val pgHelper = PairingGroupHelper(pg)
         println("zr: ${pg.zr.nqr}")
         val s = pg.zr.newElement().set(1123)
+        val n = 6
+        val k = 3
         println(s)
-        val shares = secretHelper.generateShares(s, 3, 6)
+        val shares = secretHelper.generateShares(s, k, n)
         println("shares: $shares")
 
-        val ts = mutableMapOf<Element, Element>()
-        val xList = shares.keys.toList()
         val recovered = secretHelper.recoverShare(shares)
         println("recovered: $recovered")
         assert(s.isEqual(recovered))

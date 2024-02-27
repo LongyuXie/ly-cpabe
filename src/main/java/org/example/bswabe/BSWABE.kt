@@ -139,7 +139,7 @@ class BSWABE() {
 
         for (i in satisfied) {
             val child = node.children[i]
-            val cof = secretHelper.lagrangeCoefficient(xList[i], xList)
+            val cof = secretHelper.lagrangeCoefficient(i, xList)
             val tmp = acc.duplicate().mul(cof)
             decNode(child, sk, tmp, ans)
         }
@@ -216,7 +216,7 @@ class BSWABE() {
             val c = node.children[i]
             var fz = decryptNode(sk, c)!!
             // TODO: 修改拉格朗日系数计算方式, 不再使用map
-            val cof = secretHelper.lagrangeCoefficient(xList[i], xList)
+            val cof = secretHelper.lagrangeCoefficient(i, xList)
             fz = fz.duplicate().powZn(cof)
             result.mul(fz)
         }

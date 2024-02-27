@@ -181,7 +181,7 @@ class RWABE {
 
             for (i in satisfied) {
                 val child = node.children[i]
-                val cof = secretHelper.lagrangeCoefficient(xList[i], xList)
+                val cof = secretHelper.lagrangeCoefficient(i, xList)
                 val tmp = acc.duplicate().mul(cof)
                 _genCoeff(attrs, child, tmp, result)
             }
