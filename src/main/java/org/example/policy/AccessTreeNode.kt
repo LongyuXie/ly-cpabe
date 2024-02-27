@@ -16,6 +16,7 @@ class AccessTreeNode {
     var cx: Element? = null
     var cxPrime: Element? = null
     var minSatisIndex: IntArray? = null
+    var satifiable: Boolean = false
 
     val isLeaf: Boolean
         get() = children.isEmpty() && attr != null
@@ -27,7 +28,10 @@ class AccessTreeNode {
 
     fun satisfy(attrs: Set<Attribute>): Boolean {
         if (isLeaf) {
-            return attrs.contains(attr)
+            if (attrs.contains(attr)) {
+                this.satifiable = true
+            }
+            return satifiable
         }
         val k = this.threshold!!.k
         var cnt = 0
@@ -36,7 +40,10 @@ class AccessTreeNode {
                 cnt += 1
             }
         }
-        return cnt >= k
+        if (cnt >= k) {
+            this.satifiable = true
+        }
+        return this.satifiable
     }
 
 

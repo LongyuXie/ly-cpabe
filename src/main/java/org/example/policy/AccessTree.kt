@@ -8,13 +8,9 @@ import java.util.*
 
 class AccessTree {
 
-    private var root: AccessTreeNode? = null
+    var root: AccessTreeNode? = null
+        private set
     private var policy: String? = null
-
-
-    fun getRoot(): AccessTreeNode? {
-        return root
-    }
 
 
     fun satisfy(attrs: Set<Attribute>): Boolean {
@@ -42,6 +38,7 @@ class AccessTree {
 
         return this
     }
+
 
     private fun minLeavesToSatisfy(attrs: Set<Attribute>, node: AccessTreeNode): AccessTreeNode? {
         if (node.isLeaf) {
@@ -72,8 +69,31 @@ class AccessTree {
         return node
     }
 
+
+    fun generateShares(secret: Element): Map<Attribute, Element> {
+        val root = this.root!!
+        val ans = mutableMapOf<Attribute, Element>()
+        _generateShares(secret, root, ans)
+        return ans
+    }
+
+    private fun _generateShares(secret: Element, node: AccessTreeNode, ans: MutableMap<Attribute, Element>) {
+        if (node.isLeaf) {
+            val idx = ans.size
+            val attr = node.attr!!.withId(idx)
+            ans[attr] = secret
+        } else {
+            val helper = SecretHelper(secret.field)
+            val p = helper.randomPolynomial(node.threshold!!.k-1, constant = secret)
+            for (i in node.children.indices) {
+                val x = helper.zr.newElement().set(i+1).immutable
+                val y = p.eval(x)
+                _generateShares(y, node.children[i], ans)
+            }
+        }
+    }
+
     private fun generateSharesComponent(secret: Element, node: AccessTreeNode, pk: BSWABE.MasterPublicKey) {
-        val r = pk.pg.zr.newElement().set(10).immutable
         val helper = SecretHelper(secret.field)
         val H = {
             attr: Attribute ->
@@ -82,8 +102,6 @@ class AccessTree {
         if (node.isLeaf) {
             node.cx = pk.g.powZn(secret).immutable
             node.cxPrime = H(node.attr!!).powZn(secret).immutable
-
-//            println("node ${node.attr!!.name}: e(g, g)^{r q_x(0)} = ${pk.pg.pairing(pk.g, pk.g).powZn(r.mul(secret))}")
 
         } else {
             val p = helper.randomPolynomial(node.threshold!!.k-1, constant = secret)
@@ -97,23 +115,26 @@ class AccessTree {
 
     }
 
-    private fun collectLeafs(): List<Attribute> {
-        val queue: Queue<AccessTreeNode> = LinkedList()
-        queue.add(root)
 
-        val leafs = mutableListOf<Attribute>()
 
-        while (queue.isNotEmpty()) {
-            val node = queue.poll()
-            if (node.isLeaf) {
-                leafs.add(node.attr!!)
-            } else {
-                queue.addAll(node.children)
+    fun collectLeafs(): Set<Attribute> {
+        val ans = mutableSetOf<Attribute>()
+        _collectLeafs(root!!, ans)
+        return ans
+    }
+
+    private fun _collectLeafs(node: AccessTreeNode, ans: MutableSet<Attribute>) {
+        if (node.isLeaf) {
+            val attr = node.attr!!.withId(ans.size)
+            ans.add(attr)
+        } else {
+            for (c in node.children) {
+                _collectLeafs(c, ans)
             }
         }
-        return leafs
-
     }
+
+
 
 
 

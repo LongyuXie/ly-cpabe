@@ -103,7 +103,7 @@ class BSWABE() {
 
         val acc = pg.zr.newOneElement()
         val e_gg_rs = pg.gt.newOneElement()
-        decNode(tree.getRoot()!!, sk, acc, e_gg_rs)
+        decNode(tree.root!!, sk, acc, e_gg_rs)
         val result = cph.msgdata.duplicate()
         val tmp = helper.pairing(cph.hs, sk.D!!).div(e_gg_rs)
         result.div(tmp)
