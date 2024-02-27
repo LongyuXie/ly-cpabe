@@ -1,8 +1,7 @@
-package org.example.secret
+package org.example.utils
 
 import it.unisa.dia.gas.jpbc.Element
 import it.unisa.dia.gas.jpbc.Field
-import org.example.policy.Threshold
 
 // Element -> zr
 class SecretHelper(val zr: Field<Element>) {

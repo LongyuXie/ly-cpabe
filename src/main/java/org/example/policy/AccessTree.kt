@@ -1,10 +1,9 @@
 package org.example.policy
 
 import it.unisa.dia.gas.jpbc.Element
-import org.example.bswabe.BSWABE
-import org.example.secret.SecretHelper
+import org.example.abe.bswabe.BSWABE
+import org.example.utils.SecretHelper
 import org.example.utils.HashHelper
-import java.util.*
 
 class AccessTree {
 

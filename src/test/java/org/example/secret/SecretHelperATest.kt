@@ -1,7 +1,7 @@
 package org.example.secret
 
-import it.unisa.dia.gas.jpbc.Element
 import org.example.utils.PairingGroupHelper
+import org.example.utils.SecretHelper
 import org.junit.jupiter.api.Test
 
 

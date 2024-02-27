@@ -1,11 +1,11 @@
-package org.example.bswabe
+package org.example.abe.bswabe
 
 import it.unisa.dia.gas.jpbc.Element
 import it.unisa.dia.gas.jpbc.Pairing
 import org.example.policy.AccessTree
 import org.example.policy.AccessTreeNode
 import org.example.policy.Attribute
-import org.example.secret.SecretHelper
+import org.example.utils.SecretHelper
 import org.example.utils.HashHelper
 import org.example.utils.PairingGroupHelper
 import java.util.*

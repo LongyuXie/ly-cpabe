@@ -1,7 +1,6 @@
 package org.example.policy
 
 import it.unisa.dia.gas.jpbc.Element
-import org.example.secret.SecretHelper
 
 /**
  *
