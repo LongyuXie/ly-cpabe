@@ -30,4 +30,14 @@ class ATest01 {
         assertEquals(x.hashCode(), y.hashCode())
 
     }
+    @Test
+    fun testG1() {
+        val pg = PairingGroupHelper.getSS512()!!
+        val g1 = pg.g1
+        val x = g1.newRandomElement()
+        val y = pg.zr.newZeroElement()
+//        println(x.powZn(y))
+        assertEquals(g1.newOneElement(), x.powZn(y))
+
+    }
 }
