@@ -1094,7 +1094,7 @@ public class PolicyParser {
         try {
             parser.parse();
         } catch (IOException e) {
-            e.printStackTrace();
+            return null;
         }
         return parser.getRes();
     }

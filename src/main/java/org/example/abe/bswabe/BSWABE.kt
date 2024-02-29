@@ -22,7 +22,7 @@ class BSWABE() {
 
     data class MasterPublicKey(val pg: Pairing, val g: Element, val h: Element, val f: Element, val e_gg_alpha: Element)
 
-    lateinit var mpk: MasterPublicKey
+    lateinit var pk: MasterPublicKey
 
     private lateinit var pg: Pairing
     private lateinit var helper: PairingGroupHelper
@@ -49,7 +49,7 @@ class BSWABE() {
         this.h = g.powZn(beta).immutable
         this.f = g.powZn(beta.invert()).immutable
         this.e_gg_alpha = helper.pairing(g, g).powZn(alpha)
-        this.mpk = MasterPublicKey(pg, g, h, f, e_gg_alpha)
+        this.pk = MasterPublicKey(pg, g, h, f, e_gg_alpha)
     }
 
     // to G1
@@ -74,16 +74,37 @@ class BSWABE() {
 
 
     // m: Gt
-    fun enc(m: Element, policy: String): Ciphertext {
+    fun encrypt(m: Element, policy: String): Ciphertext {
         val tree = AccessTree.fromPolicyString(policy)
         val s = helper.randomZr()
         val C_Tilde = m.duplicate().mul(e_gg_alpha.powZn(s)).immutable
         val C = h.powZn(s).immutable
 
-        tree.fillPolicy(s, mpk)
+        generateSharesComponent(tree.root!!, s)
+
         return Ciphertext(C_Tilde, C, tree)
     }
 
+    private fun generateSharesComponent(node: AccessTreeNode, s: Element) {
+        val helper = SecretHelper(s.field)
+        val H = {
+                attr: Attribute ->
+            HashHelper(pk.pg).hashFromStringToG1(attr.name)
+        }
+        if (node.isLeaf) {
+            node.cx = pk.g.powZn(s).immutable
+            node.cxPrime = H(node.attr!!).powZn(s).immutable
+
+        } else {
+            val p = helper.randomPolynomial(node.threshold!!.k-1, constant = s)
+
+            for (i in node.children.indices) {
+                val x = helper.zr.newElement().set(i+1).immutable
+                val y = p.eval(x)
+                generateSharesComponent(node.children[i], y)
+            }
+        }
+    }
 
     /**
      * @property msgdata GT element: m * e(g, g)^{alpha*s}
@@ -93,7 +114,7 @@ class BSWABE() {
     class Ciphertext(val msgdata: Element, val hs: Element, val tree: AccessTree)
 
 
-    fun dec(cph: Ciphertext, sk: SecretKey): Element? {
+    fun decrypt(cph: Ciphertext, sk: SecretKey): Element? {
         val attrs = sk.dMap!!.keys
         val tree = cph.tree.minLeavesToSatisfy(attrs)
         if (tree == null) {
@@ -147,10 +168,6 @@ class BSWABE() {
 
     companion object {
 
-        fun hashAttr(attr: Attribute, pg: Pairing): Element {
-            return HashHelper(pg).hashFromStringToG1(attr.name)
-        }
-
         @JvmStatic
         fun main(args: Array<String>) {
             val bswabe = BSWABE()
@@ -164,10 +181,10 @@ class BSWABE() {
 
             println("policy: $policy")
             println("enc")
-            val ciphertext = bswabe.enc(m, policy)
+            val ciphertext = bswabe.encrypt(m, policy)
             println("message: $m")
             println("dec")
-            val result = bswabe.dec(ciphertext, sk)
+            val result = bswabe.decrypt(ciphertext, sk)
 
 //            println(bswabe.pg.pairing(bswabe.mpk.g, bswabe.mpk.g).powZn(bswabe.pg.zr.newElement().set(200)))
 
@@ -187,9 +204,14 @@ class BSWABE() {
     }
 
     /**
+     * 递归解密，从叶子节点开始，逐步向上解密
+     * 每个satisfied的节点需要进行一次配对
+     * 需要预处理minSatisIndex
+     * @param sk SecretKey
+     * @param node AccessTreeNode
      * @return GT element
      */
-    private fun decryptNode(sk: SecretKey, node: AccessTreeNode): Element? {
+    private fun decryptNode(node: AccessTreeNode, sk: SecretKey): Element? {
         if (node.isLeaf) {
             return if (sk.dMap?.contains(node.attr!!) == true) {
                 val di = sk.dMap!![node.attr!!]!!.first
@@ -214,8 +236,7 @@ class BSWABE() {
         val result = pg.gt.newOneElement()
         for (i in satisfied) {
             val c = node.children[i]
-            var fz = decryptNode(sk, c)!!
-            // TODO: 修改拉格朗日系数计算方式, 不再使用map
+            var fz = decryptNode(c, sk)!!
             val cof = secretHelper.lagrangeCoefficient(i, xList)
             fz = fz.duplicate().powZn(cof)
             result.mul(fz)
