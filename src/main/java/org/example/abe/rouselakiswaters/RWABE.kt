@@ -5,8 +5,7 @@ import it.unisa.dia.gas.jpbc.Pairing
 import org.example.policy.AccessTree
 import org.example.policy.AccessTreeNode
 import org.example.policy.Attribute
-import org.example.utils.SecretHelper
-import org.example.utils.PairingGroupHelper
+import org.example.utils.*
 import java.util.*
 
 
@@ -115,6 +114,36 @@ class RWABE {
     }
 
 
+    fun CsEncrypt(policy: String): Ciphertext {
+        val tree = AccessTree.fromPolicyString(policy)
+        val s = helper.randomZr()
+        val C = pk.e_gg_alpha.powZn(s)
+        val C0 = pk.g.powZn(s)
+        val shares = tree.generateShares(s)
+        val CtMap = shares.entries.associate {
+            val tt = helper.randomZr()
+            val ct1 = pk.w.powZn(it.value).mul(pk.v.powZn(tt))
+            val ct2 = pk.u.powZn(helper.setInt(attrMap[it.key.noId()]!!)).mul(pk.h).powZn(tt.negate())
+            val ct3 = pk.g.powZn(tt)
+            Pair(it.key, Triple(ct1, ct2, ct3))
+        }
+        return Ciphertext(C, C0, CtMap, policy)
+    }
+
+    fun DoEncrypt(message: Element, cph: Ciphertext): Ciphertext {
+        val c = helper.randomZr()
+        val C = message.duplicate().mul(cph.C.duplicate().powZn(c))
+        val Co = cph.C0.duplicate().powZn(c)
+        val CtMap = cph.CtMap.entries.associate {
+            val ct1 = it.value.first.duplicate().powZn(c)
+            val ct2 = it.value.second.duplicate().powZn(c)
+            val ct3 = it.value.third.duplicate().powZn(c)
+            Pair(it.key, Triple(ct1, ct2, ct3))
+        }
+        return Ciphertext(C, Co, CtMap, cph.policy)
+    }
+
+
     fun decrypt(cph: Ciphertext, sk: SecretKey): Element? {
         val tree = cph.policy.let { AccessTree.fromPolicyString(it) }
 
@@ -190,40 +219,38 @@ class RWABE {
         }
     }
 
-
     companion object {
         @JvmStatic
         fun main(args: Array<String>) {
-            val abe = RWABE()
-            abe.setup()
-            val attrs = setOf(Attribute("a"), Attribute("b"), Attribute("c"))
-            'a'.rangeTo('z').forEach {
-                abe.regAttr(Attribute(it.toString()))
-            }
-//            attrs.forEach { abe.regAttr(it) }
-            val sk = abe.keygen(attrs)
-            val m = abe.helper.randomGT()
-            val policy = "(A or B) and (C or D) ".lowercase(Locale.getDefault())
-            println("policy: $policy")
-            println("enc")
-            val ciphertext = abe.encrypt(m, policy)
-            println("message: $m")
-            println("dec")
-            val result = abe.decrypt(ciphertext, sk)
+            val ret = benchmark()
+            writeToCSV("RWABE.csv", ret, listOf("attrs", "rwabe", "myabe"))
+        }
 
-            if (result != null) {
-                println("result: $result")
-                if (m.isEqual(result)) {
-                    println("Decryption success")
-                } else {
-                    println("Decryption failed")
+        @JvmStatic
+        fun benchmark(): MutableList<MutableList<Int>> {
+            val rec = mutableListOf<MutableList<Int>>()
+            for (i in 5..20) {
+                val r = mutableListOf<Int>()
+                r.add(i)
+                val abe = RWABE()
+                abe.setup()
+                val policy = randomPolicy(i)
+                extractAttrs(policy).forEach {
+                    val a = Attribute(it)
+                    abe.regAttr(a)
                 }
-            } else {
-                println("result is null")
-                println("Decryption failed")
+                val m = abe.helper.randomGT()
+
+                var cph: Ciphertext? = null
+
+                val t1 = execTime { cph = abe.encrypt(m, policy) }
+                val t4 = execTime { cph = cph?.let { abe.DoEncrypt(m, it) } }
+                r.add(t1)
+                r.add(t4)
+                rec.add(r)
             }
-
-
+            rec.forEach(::println)
+            return rec
         }
     }
 
