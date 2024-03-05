@@ -38,6 +38,20 @@ class ATest01 {
         val y = pg.zr.newZeroElement()
 //        println(x.powZn(y))
         assertEquals(g1.newOneElement(), x.powZn(y))
+    }
+
+    @Test
+    fun testGTZero() {
+        val pg = PairingGroupHelper.getSS512()!!
+        val zero = pg.zr.newZeroElement()
+        val g = pg.g1.newRandomElement()
+        // g^x = 1
+        // x = 0 or x = order(g)
+        val egg = pg.pairing(g, g).immutable
+        val eggZero = egg.powZn(zero).immutable
+        val one = pg.gt.newOneElement().immutable
+        assertEquals(one, eggZero)
+//        assertEquals(one, zero)
 
     }
 }
