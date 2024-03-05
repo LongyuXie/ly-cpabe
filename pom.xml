@@ -33,6 +33,11 @@
             <version>RELEASE</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.ejml</groupId>
+            <artifactId>ejml-simple</artifactId>
+            <version>0.43.1</version> <!-- 使用最新版本 -->
+        </dependency>
     </dependencies>
 
     <build>
